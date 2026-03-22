@@ -26,6 +26,9 @@ function ImagePicker({ currentKey, onSelect }: { currentKey: string; onSelect: (
     if (!file) return;
     let key = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
     if (!key) key = `image_${Date.now()}`;
+    // If this sanitized key is already taken by a *different* filename, make it unique
+    const existing = assets.find((a) => a.key === key);
+    if (existing && existing.filename !== file.name) key = `${key}_${Date.now()}`;
     const reader = new FileReader();
     reader.onload = (ev) => {
       const dataUrl = ev.target?.result as string;

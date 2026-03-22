@@ -25,8 +25,8 @@ const defaultScene: SceneData = {
   id: 'scene-1',
   name: 'My Scene',
   backgroundColor: '#1a1a2e',
-  width: 800,
-  height: 600,
+  width: 640,
+  height: 480,
   objects: [],
   script: '// Scene script\n// The "scene" variable refers to the Phaser Scene instance\n// Example: scene.add.text(100, 100, "Hello!", { color: "#ffffff" });\n',
 };
@@ -36,7 +36,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   selectedObjectId: null,
   activePanel: 'scene',
   isPlaying: false,
-  gridSize: 16,
+  gridSize: 20,
   snapToGrid: false,
 
   addObject: (obj) =>

@@ -169,7 +169,7 @@ function Toolbar() {
         const { selectedObjectId: id, scene: s } = useEditorStore.getState();
         if (id) {
           const obj = s.objects.find((o) => o.id === id);
-          if (obj) clipboard = { ...obj };
+          if (obj) clipboard = structuredClone(obj);
         }
       }
 

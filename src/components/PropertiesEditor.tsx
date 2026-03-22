@@ -24,7 +24,7 @@ function ImagePicker({ currentKey, onSelect }: { currentKey: string; onSelect: (
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    let key = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+    let key = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_\-]/g, '_');
     if (!key) key = `image_${Date.now()}`;
     // If this sanitized key is already taken by a *different* filename, make it unique
     const existing = assets.find((a) => a.key === key);

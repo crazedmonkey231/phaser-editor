@@ -207,6 +207,10 @@ class EditorScene extends Phaser.Scene {
   runScript(script: string) {
     if (!script.trim()) return;
     try {
+      // NOTE: new Function() is intentional here. This is a game editor where the
+      // author writes and runs their own scene scripts. The script receives the
+      // Phaser scene instance as its only argument. Users should only run scripts
+      // they trust, as this executes arbitrary JavaScript in the page context.
       // eslint-disable-next-line no-new-func
       const fn = new Function('scene', script);
       fn(this);
@@ -269,6 +273,9 @@ function PreviewCanvas() {
       gameRef.current = null;
       sceneRef.current = null;
     };
+    // This effect runs once on mount to create the Phaser game instance. The game
+    // is kept alive for the lifetime of the component; subsequent store changes are
+    // handled by the subscription in the second useEffect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

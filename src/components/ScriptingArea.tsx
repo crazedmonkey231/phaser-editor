@@ -37,6 +37,9 @@ function ScriptingArea() {
       view.destroy();
       viewRef.current = null;
     };
+    // The editor is created once on mount. setScript is a stable Zustand action and
+    // does not need to be listed as a dependency—adding it would re-create the editor
+    // on every render cycle and destroy the user's cursor position.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

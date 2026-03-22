@@ -2,8 +2,10 @@ import { useRef } from 'react';
 import { useEditorStore } from '../store/editorStore';
 import { RectangleObject, CircleObject, TextObject } from '../types/scene';
 
-let objectCounter = 0;
-const generateObjectId = () => `obj-${++objectCounter}-${Date.now()}`;
+const generateObjectId = () =>
+  typeof crypto !== 'undefined' && crypto.randomUUID
+    ? `obj-${crypto.randomUUID()}`
+    : `obj-${Math.random().toString(36).slice(2)}-${Date.now()}`;
 
 function Toolbar() {
   const { scene, selectedObjectId, isPlaying, addObject, removeObject, setPlaying } =

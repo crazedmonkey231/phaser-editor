@@ -27,6 +27,7 @@ interface EditorSceneInitData {
   sceneData: SceneData;
   isPlaying: boolean;
   onSelect: (id: string | null) => void;
+  onUpdateObject: (id: string, updates: Partial<AnyGameObject>) => void;
 }
 
 class EditorScene extends Phaser.Scene {
@@ -35,7 +36,11 @@ class EditorScene extends Phaser.Scene {
   private sceneData!: SceneData;
   private isPlaying = false;
   private onSelect!: (id: string | null) => void;
+  private onUpdateObject!: (id: string, updates: Partial<AnyGameObject>) => void;
   private scriptCleanup: (() => void) | null = null;
+  private dragObjectId: string | null = null;
+  private dragOffsetX = 0;
+  private dragOffsetY = 0;
 
   constructor() {
     super({ key: 'EditorScene' });
@@ -45,6 +50,7 @@ class EditorScene extends Phaser.Scene {
     this.sceneData = data.sceneData;
     this.isPlaying = data.isPlaying;
     this.onSelect = data.onSelect;
+    this.onUpdateObject = data.onUpdateObject;
   }
 
   create() {
@@ -52,6 +58,29 @@ class EditorScene extends Phaser.Scene {
     this.selectionHighlight.setDepth(9999);
 
     this.buildScene(this.sceneData);
+
+    if (!this.isPlaying) {
+      this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+        if (this.dragObjectId) {
+          const go = this.displayObjects.get(this.dragObjectId);
+          if (go) {
+            go.setPosition(pointer.worldX - this.dragOffsetX, pointer.worldY - this.dragOffsetY);
+            this.updateSelectionHighlight(this.dragObjectId, this.sceneData);
+          }
+        }
+      });
+
+      this.input.on('pointerup', () => {
+        if (this.dragObjectId) {
+          const go = this.displayObjects.get(this.dragObjectId);
+          if (go) {
+            this.onUpdateObject(this.dragObjectId, { x: Math.round(go.x), y: Math.round(go.y) });
+          }
+          this.dragObjectId = null;
+          this.game.canvas.style.cursor = 'default';
+        }
+      });
+    }
 
     if (this.isPlaying) {
       this.runScript(this.sceneData.script);
@@ -152,15 +181,23 @@ class EditorScene extends Phaser.Scene {
           go.setInteractive();
         }
 
-        go.on('pointerdown', () => {
+        go.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
           this.onSelect(obj.id);
+          this.dragObjectId = obj.id;
+          this.dragOffsetX = pointer.worldX - go.x;
+          this.dragOffsetY = pointer.worldY - go.y;
+          this.game.canvas.style.cursor = 'grabbing';
         });
 
         go.on('pointerover', () => {
-          this.game.canvas.style.cursor = 'pointer';
+          if (!this.dragObjectId) {
+            this.game.canvas.style.cursor = 'grab';
+          }
         });
         go.on('pointerout', () => {
-          this.game.canvas.style.cursor = 'default';
+          if (!this.dragObjectId) {
+            this.game.canvas.style.cursor = 'default';
+          }
         });
       }
     }
@@ -184,21 +221,27 @@ class EditorScene extends Phaser.Scene {
     const obj = data.objects.find((o) => o.id === selectedId);
     if (!obj) return;
 
+    // Use the display object's current position so the highlight tracks during drags
+    const go = this.displayObjects.get(obj.id);
+    if (!go) return;
+
+    const currentX = go.x;
+    const currentY = go.y;
+
     this.selectionHighlight.lineStyle(2, 0xa855f7, 1);
 
     if (obj.type === 'rectangle') {
       const r = obj as RectangleObject;
       this.selectionHighlight.strokeRect(
-        r.x - r.width / 2 - 2,
-        r.y - r.height / 2 - 2,
+        currentX - r.width / 2 - 2,
+        currentY - r.height / 2 - 2,
         r.width + 4,
         r.height + 4
       );
     } else if (obj.type === 'circle') {
       const c = obj as CircleObject;
-      this.selectionHighlight.strokeCircle(c.x, c.y, c.radius + 3);
+      this.selectionHighlight.strokeCircle(currentX, currentY, c.radius + 3);
     } else if (obj.type === 'text') {
-      const go = this.displayObjects.get(obj.id);
       if (go instanceof Phaser.GameObjects.Text) {
         const b = go.getBounds();
         this.selectionHighlight.strokeRect(b.x - 2, b.y - 2, b.width + 4, b.height + 4);
@@ -266,6 +309,7 @@ function PreviewCanvas() {
         sceneData: scene,
         isPlaying,
         onSelect: selectObject,
+        onUpdateObject: (id: string, updates: Partial<AnyGameObject>) => useEditorStore.getState().updateObject(id, updates),
       });
       sceneRef.current = game.scene.getScene('EditorScene') as EditorScene;
     });
@@ -301,6 +345,7 @@ function PreviewCanvas() {
           sceneData: state.scene,
           isPlaying: state.isPlaying,
           onSelect: state.selectObject,
+          onUpdateObject: (id: string, updates: Partial<AnyGameObject>) => useEditorStore.getState().updateObject(id, updates),
         });
         return;
       }
@@ -345,6 +390,7 @@ function PreviewCanvas() {
           sceneData: state.scene,
           isPlaying: state.isPlaying,
           onSelect: state.selectObject,
+          onUpdateObject: (id: string, updates: Partial<AnyGameObject>) => useEditorStore.getState().updateObject(id, updates),
         });
       }
     });

@@ -1,5 +1,7 @@
 export type GameObjectType = 'rectangle' | 'circle' | 'text' | 'image';
 
+export type SnapOrigin = 'center' | 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight';
+
 export interface BaseGameObject {
   id: string;
   type: GameObjectType;
@@ -11,6 +13,7 @@ export interface BaseGameObject {
   depth: number;
   visible: boolean;
   script?: string;
+  snapOrigin?: SnapOrigin;
 }
 
 export interface RectangleObject extends BaseGameObject {

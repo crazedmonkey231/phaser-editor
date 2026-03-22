@@ -28,11 +28,14 @@ interface EditorSceneInitData {
   isPlaying: boolean;
   onSelect: (id: string | null) => void;
   onUpdateObject: (id: string, updates: Partial<AnyGameObject>) => void;
+  gridSize: number;
+  snapToGrid: boolean;
 }
 
 class EditorScene extends Phaser.Scene {
   public displayObjects: Map<string, PhaserDisplayObject> = new Map();
   private selectionHighlight!: Phaser.GameObjects.Graphics;
+  private gridGraphics!: Phaser.GameObjects.Graphics;
   private sceneData!: SceneData;
   private isPlaying = false;
   private onSelect!: (id: string | null) => void;
@@ -41,6 +44,8 @@ class EditorScene extends Phaser.Scene {
   private dragObjectId: string | null = null;
   private dragOffsetX = 0;
   private dragOffsetY = 0;
+  private gridSize = 16;
+  private snapToGrid = false;
 
   constructor() {
     super({ key: 'EditorScene' });
@@ -51,9 +56,92 @@ class EditorScene extends Phaser.Scene {
     this.isPlaying = data.isPlaying;
     this.onSelect = data.onSelect;
     this.onUpdateObject = data.onUpdateObject;
+    this.gridSize = data.gridSize ?? 16;
+    this.snapToGrid = data.snapToGrid ?? false;
+  }
+
+  // Returns the offset from object origin to snap point based on snapOrigin setting
+  private getSnapOffset(objId: string): { dx: number; dy: number } {
+    const obj = this.sceneData.objects.find((o) => o.id === objId);
+    if (!obj) return { dx: 0, dy: 0 };
+
+    const origin = obj.snapOrigin ?? 'center';
+
+    if (obj.type === 'rectangle') {
+      const r = obj as RectangleObject;
+      const hw = r.width / 2;
+      const hh = r.height / 2;
+      switch (origin) {
+        case 'topLeft':     return { dx: -hw, dy: -hh };
+        case 'topRight':    return { dx:  hw, dy: -hh };
+        case 'bottomLeft':  return { dx: -hw, dy:  hh };
+        case 'bottomRight': return { dx:  hw, dy:  hh };
+        default:            return { dx: 0, dy: 0 }; // center
+      }
+    } else if (obj.type === 'circle') {
+      const c = obj as CircleObject;
+      const r = c.radius;
+      switch (origin) {
+        case 'topLeft':     return { dx: -r, dy: -r };
+        case 'topRight':    return { dx:  r, dy: -r };
+        case 'bottomLeft':  return { dx: -r, dy:  r };
+        case 'bottomRight': return { dx:  r, dy:  r };
+        default:            return { dx: 0, dy: 0 };
+      }
+    } else if (obj.type === 'text') {
+      // Text origin in Phaser defaults to top-left, so stored x/y is top-left
+      const go = this.displayObjects.get(objId);
+      if (go instanceof Phaser.GameObjects.Text) {
+        const bounds = go.getBounds();
+        const w = bounds.width;
+        const h = bounds.height;
+        switch (origin) {
+          case 'center':      return { dx: w / 2, dy: h / 2 };
+          case 'topRight':    return { dx: w, dy: 0 };
+          case 'bottomLeft':  return { dx: 0, dy: h };
+          case 'bottomRight': return { dx: w, dy: h };
+          default:            return { dx: 0, dy: 0 }; // topLeft
+        }
+      }
+    }
+
+    return { dx: 0, dy: 0 };
+  }
+
+  // Snaps the given object position to the grid using the object's snap origin
+  private applySnap(objId: string, rawX: number, rawY: number): { x: number; y: number } {
+    if (!this.snapToGrid || this.gridSize <= 0) return { x: rawX, y: rawY };
+    const { dx, dy } = this.getSnapOffset(objId);
+    const snappedPtX = Math.round((rawX + dx) / this.gridSize) * this.gridSize;
+    const snappedPtY = Math.round((rawY + dy) / this.gridSize) * this.gridSize;
+    return { x: snappedPtX - dx, y: snappedPtY - dy };
+  }
+
+  // Draws (or clears) the grid overlay
+  drawGrid() {
+    this.gridGraphics.clear();
+    if (!this.snapToGrid || this.gridSize <= 0) return;
+    this.gridGraphics.lineStyle(1, 0x444466, 0.4);
+    for (let x = 0; x <= this.sceneData.width; x += this.gridSize) {
+      this.gridGraphics.lineBetween(x, 0, x, this.sceneData.height);
+    }
+    for (let y = 0; y <= this.sceneData.height; y += this.gridSize) {
+      this.gridGraphics.lineBetween(0, y, this.sceneData.width, y);
+    }
+  }
+
+  // Update snap/grid settings without restarting the scene
+  updateSnapSettings(snapToGrid: boolean, gridSize: number) {
+    this.snapToGrid = snapToGrid;
+    this.gridSize = gridSize;
+    this.drawGrid();
   }
 
   create() {
+    this.gridGraphics = this.add.graphics();
+    this.gridGraphics.setDepth(0);
+    this.drawGrid();
+
     this.selectionHighlight = this.add.graphics();
     this.selectionHighlight.setDepth(9999);
 
@@ -64,7 +152,10 @@ class EditorScene extends Phaser.Scene {
         if (this.dragObjectId) {
           const go = this.displayObjects.get(this.dragObjectId);
           if (go) {
-            go.setPosition(pointer.worldX - this.dragOffsetX, pointer.worldY - this.dragOffsetY);
+            const rawX = pointer.worldX - this.dragOffsetX;
+            const rawY = pointer.worldY - this.dragOffsetY;
+            const { x, y } = this.applySnap(this.dragObjectId, rawX, rawY);
+            go.setPosition(x, y);
             this.updateSelectionHighlight(this.dragObjectId, this.sceneData);
           }
         }
@@ -74,7 +165,9 @@ class EditorScene extends Phaser.Scene {
         if (this.dragObjectId) {
           const go = this.displayObjects.get(this.dragObjectId);
           if (go) {
-            this.onUpdateObject(this.dragObjectId, { x: Math.round(go.x), y: Math.round(go.y) });
+            const { x, y } = this.applySnap(this.dragObjectId, go.x, go.y);
+            go.setPosition(x, y);
+            this.onUpdateObject(this.dragObjectId, { x: Math.round(x), y: Math.round(y) });
           }
           this.dragObjectId = null;
           this.game.canvas.style.cursor = 'default';
@@ -305,11 +398,14 @@ function PreviewCanvas() {
     gameRef.current = game;
 
     game.events.on(Phaser.Core.Events.READY, () => {
+      const { gridSize, snapToGrid } = useEditorStore.getState();
       game.scene.add('EditorScene', EditorScene, true, {
         sceneData: scene,
         isPlaying,
         onSelect: selectObject,
         onUpdateObject: (id: string, updates: Partial<AnyGameObject>) => useEditorStore.getState().updateObject(id, updates),
+        gridSize,
+        snapToGrid,
       });
       sceneRef.current = game.scene.getScene('EditorScene') as EditorScene;
     });
@@ -346,6 +442,8 @@ function PreviewCanvas() {
           isPlaying: state.isPlaying,
           onSelect: state.selectObject,
           onUpdateObject: (id: string, updates: Partial<AnyGameObject>) => useEditorStore.getState().updateObject(id, updates),
+          gridSize: state.gridSize,
+          snapToGrid: state.snapToGrid,
         });
         return;
       }
@@ -353,6 +451,11 @@ function PreviewCanvas() {
       // Background color changed
       if (state.scene.backgroundColor !== prev.scene.backgroundColor) {
         pScene.cameras.main.setBackgroundColor(state.scene.backgroundColor);
+      }
+
+      // Snap settings changed
+      if (state.snapToGrid !== prev.snapToGrid || state.gridSize !== prev.gridSize) {
+        pScene.updateSnapSettings(state.snapToGrid, state.gridSize);
       }
 
       // Objects changed
@@ -391,6 +494,8 @@ function PreviewCanvas() {
           isPlaying: state.isPlaying,
           onSelect: state.selectObject,
           onUpdateObject: (id: string, updates: Partial<AnyGameObject>) => useEditorStore.getState().updateObject(id, updates),
+          gridSize: state.gridSize,
+          snapToGrid: state.snapToGrid,
         });
       }
     });

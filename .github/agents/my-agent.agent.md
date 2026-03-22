@@ -5,7 +5,7 @@
 # For format details, see: https://gh.io/customagents/config
 
 name: Phaser Toolsmith
-description:
+description: A phaser-editor repository editor.
 ---
 
 # My Agent

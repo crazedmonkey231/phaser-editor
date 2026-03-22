@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useEditorStore } from '../store/editorStore';
 import { RectangleObject, CircleObject, TextObject } from '../types/scene';
 
@@ -11,6 +11,8 @@ function Toolbar() {
   const { scene, selectedObjectId, isPlaying, addObject, removeObject, setPlaying } =
     useEditorStore();
   const importRef = useRef<HTMLInputElement>(null);
+  const [addDropdownOpen, setAddDropdownOpen] = useState(false);
+  const addDropdownRef = useRef<HTMLDivElement>(null);
 
   const handleAddRectangle = () => {
     const obj: RectangleObject = {
@@ -106,19 +108,70 @@ function Toolbar() {
     setPlaying(!isPlaying);
   };
 
+  const addObjectAndClose = (addHandler: () => void) => {
+    addHandler();
+    setAddDropdownOpen(false);
+  };
+
+  // Close the "Add Object" dropdown when clicking outside it
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (addDropdownRef.current && !addDropdownRef.current.contains(e.target as Node)) {
+        setAddDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  // Delete selected object with the Delete or Backspace key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      const { selectedObjectId: id, removeObject: remove } = useEditorStore.getState();
+      if (id) remove(id);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
     <div className="toolbar">
       <span className="toolbar-title">⚡ Phaser Editor</span>
       <div className="toolbar-divider" />
-      <button className="btn" onClick={handleAddRectangle} title="Add Rectangle">
-        ▭ Rectangle
-      </button>
-      <button className="btn" onClick={handleAddCircle} title="Add Circle">
-        ● Circle
-      </button>
-      <button className="btn" onClick={handleAddText} title="Add Text">
-        T Text
-      </button>
+      <div className="add-object-dropdown" ref={addDropdownRef}>
+        <button
+          className="btn"
+          onClick={() => setAddDropdownOpen((prev: boolean) => !prev)}
+          title="Add Object"
+        >
+          ＋ Add Object ▾
+        </button>
+        {addDropdownOpen && (
+          <div className="dropdown-menu">
+            <button
+              className="dropdown-item"
+              onClick={() => addObjectAndClose(handleAddRectangle)}
+            >
+              ▭ Rectangle
+            </button>
+            <button
+              className="dropdown-item"
+              onClick={() => addObjectAndClose(handleAddCircle)}
+            >
+              ● Circle
+            </button>
+            <button
+              className="dropdown-item"
+              onClick={() => addObjectAndClose(handleAddText)}
+            >
+              T Text
+            </button>
+          </div>
+        )}
+      </div>
       <div className="toolbar-divider" />
       <button
         className="btn btn-danger"

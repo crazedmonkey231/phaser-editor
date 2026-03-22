@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useEditorStore } from '../store/editorStore';
-import { RectangleObject, CircleObject, TextObject } from '../types/scene';
+import { AnyGameObject, RectangleObject, CircleObject, TextObject, ImageObject } from '../types/scene';
 
 const generateObjectId = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID
     ? `obj-${crypto.randomUUID()}`
     : `obj-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+
+// Module-level clipboard so paste works across re-renders
+let clipboard: AnyGameObject | null = null;
 
 function Toolbar() {
   const { scene, selectedObjectId, isPlaying, snapToGrid, gridSize, addObject, removeObject, setPlaying, setSnapToGrid, setGridSize } =
@@ -64,6 +67,24 @@ function Toolbar() {
       fontSize: 24,
       fontFamily: 'Arial',
       color: '#ffffff',
+      rotation: 0,
+      alpha: 1,
+      depth: 0,
+      visible: true,
+    };
+    addObject(obj);
+  };
+
+  const handleAddImage = () => {
+    const obj: ImageObject = {
+      id: generateObjectId(),
+      type: 'image',
+      name: `Image ${scene.objects.length + 1}`,
+      x: 160 + scene.objects.length * 20,
+      y: 160 + scene.objects.length * 20,
+      imageKey: '',
+      scaleX: 1,
+      scaleY: 1,
       rotation: 0,
       alpha: 1,
       depth: 0,
@@ -137,6 +158,41 @@ function Toolbar() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Ctrl+C / Ctrl+V copy-paste — useEditorStore.getState() is called inside the
+  // handler intentionally so each keystroke reads the latest state without
+  // re-registering the listener on every render.
+  useEffect(() => {
+    const handleCopyPaste = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        e.preventDefault();
+        const { selectedObjectId: id, scene: s } = useEditorStore.getState();
+        if (id) {
+          const obj = s.objects.find((o) => o.id === id);
+          if (obj) clipboard = structuredClone(obj);
+        }
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        if (!clipboard) return;
+        e.preventDefault();
+        const { addObject: add } = useEditorStore.getState();
+        const pasted: AnyGameObject = {
+          ...clipboard,
+          id: generateObjectId(),
+          name: `${clipboard.name} (copy)`,
+          x: clipboard.x + 20,
+          y: clipboard.y + 20,
+        };
+        add(pasted);
+      }
+    };
+    document.addEventListener('keydown', handleCopyPaste);
+    return () => document.removeEventListener('keydown', handleCopyPaste);
+  }, []);
+
   return (
     <div className="toolbar">
       <span className="toolbar-title">⚡ Phaser Editor</span>
@@ -168,6 +224,12 @@ function Toolbar() {
               onClick={() => addObjectAndClose(handleAddText)}
             >
               T Text
+            </button>
+            <button
+              className="dropdown-item"
+              onClick={() => addObjectAndClose(handleAddImage)}
+            >
+              🖼 Image
             </button>
           </div>
         )}

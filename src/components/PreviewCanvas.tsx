@@ -60,6 +60,8 @@ class EditorScene extends Phaser.Scene {
 
   // Build (or rebuild) all display objects from scene data
   buildScene(data: SceneData) {
+    this.sceneData = data;
+
     // Destroy existing
     this.displayObjects.forEach((go) => go.destroy());
     this.displayObjects.clear();
@@ -252,7 +254,7 @@ function PreviewCanvas() {
       height: scene.height,
       parent: containerRef.current,
       backgroundColor: scene.backgroundColor,
-      scene: EditorScene,
+      scene: [],
       input: { mouse: { preventDefaultWheel: false } },
     };
 
@@ -260,12 +262,12 @@ function PreviewCanvas() {
     gameRef.current = game;
 
     game.events.on(Phaser.Core.Events.READY, () => {
-      const phaserScene = game.scene.getScene('EditorScene') as EditorScene;
-      sceneRef.current = phaserScene;
-      phaserScene.init({ sceneData: scene, isPlaying, onSelect: selectObject });
-      // init is called internally before create; we must restart to pass data
-      game.scene.stop('EditorScene');
-      game.scene.start('EditorScene', { sceneData: scene, isPlaying, onSelect: selectObject });
+      game.scene.add('EditorScene', EditorScene, true, {
+        sceneData: scene,
+        isPlaying,
+        onSelect: selectObject,
+      });
+      sceneRef.current = game.scene.getScene('EditorScene') as EditorScene;
     });
 
     return () => {
@@ -326,6 +328,8 @@ function PreviewCanvas() {
             pScene.updateDisplayObject(obj);
           }
         });
+
+        pScene.updateSelectionHighlight(state.selectedObjectId, state.scene);
       }
 
       // Selection changed

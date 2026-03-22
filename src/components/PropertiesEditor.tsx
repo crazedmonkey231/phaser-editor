@@ -1,5 +1,5 @@
 import { useEditorStore } from '../store/editorStore';
-import { AnyGameObject, RectangleObject, CircleObject, TextObject } from '../types/scene';
+import { AnyGameObject, RectangleObject, CircleObject, TextObject, SnapOrigin } from '../types/scene';
 
 function PropRow({
   label,
@@ -137,6 +137,19 @@ function PropertiesEditor() {
               checked={selectedObj.visible}
               onChange={(e) => upd({ visible: e.target.checked })}
             />
+          </PropRow>
+          <PropRow label="Snap Origin">
+            <select
+              className="prop-input"
+              value={selectedObj.snapOrigin ?? 'center'}
+              onChange={(e) => upd({ snapOrigin: e.target.value as SnapOrigin })}
+            >
+              <option value="center">Center</option>
+              <option value="topLeft">Top Left</option>
+              <option value="topRight">Top Right</option>
+              <option value="bottomLeft">Bottom Left</option>
+              <option value="bottomRight">Bottom Right</option>
+            </select>
           </PropRow>
         </div>
 

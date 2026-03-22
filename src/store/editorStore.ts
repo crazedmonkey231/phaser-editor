@@ -6,6 +6,8 @@ interface EditorState {
   selectedObjectId: string | null;
   activePanel: 'scene' | 'script' | 'properties';
   isPlaying: boolean;
+  gridSize: number;
+  snapToGrid: boolean;
 
   addObject: (obj: AnyGameObject) => void;
   removeObject: (id: string) => void;
@@ -15,6 +17,8 @@ interface EditorState {
   setActivePanel: (panel: 'scene' | 'script' | 'properties') => void;
   setScript: (script: string) => void;
   setPlaying: (playing: boolean) => void;
+  setGridSize: (size: number) => void;
+  setSnapToGrid: (enabled: boolean) => void;
 }
 
 const defaultScene: SceneData = {
@@ -32,6 +36,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   selectedObjectId: null,
   activePanel: 'scene',
   isPlaying: false,
+  gridSize: 16,
+  snapToGrid: false,
 
   addObject: (obj) =>
     set((state) => ({
@@ -73,4 +79,8 @@ export const useEditorStore = create<EditorState>((set) => ({
     })),
 
   setPlaying: (playing) => set({ isPlaying: playing }),
+
+  setGridSize: (size) => set({ gridSize: size }),
+
+  setSnapToGrid: (enabled) => set({ snapToGrid: enabled }),
 }));

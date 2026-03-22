@@ -8,7 +8,7 @@ const generateObjectId = () =>
     : `obj-${Math.random().toString(36).slice(2)}-${Date.now()}`;
 
 function Toolbar() {
-  const { scene, selectedObjectId, isPlaying, addObject, removeObject, setPlaying } =
+  const { scene, selectedObjectId, isPlaying, snapToGrid, gridSize, addObject, removeObject, setPlaying, setSnapToGrid, setGridSize } =
     useEditorStore();
   const importRef = useRef<HTMLInputElement>(null);
   const [addDropdownOpen, setAddDropdownOpen] = useState(false);
@@ -203,6 +203,27 @@ function Toolbar() {
       >
         {isPlaying ? '⏹ Stop' : '▶ Play'}
       </button>
+      <div className="toolbar-divider" />
+      <label className="snap-toggle" title="Snap to Grid">
+        <input
+          type="checkbox"
+          checked={snapToGrid}
+          onChange={(e) => setSnapToGrid(e.target.checked)}
+        />
+        <span>⊞ Snap</span>
+      </label>
+      <input
+        className="grid-size-input"
+        type="number"
+        min="4"
+        max="128"
+        step="4"
+        value={gridSize}
+        disabled={!snapToGrid}
+        onChange={(e) => setGridSize(Math.max(4, Number(e.target.value)))}
+        title="Grid size (px)"
+      />
+      <span className="grid-size-label">px</span>
     </div>
   );
 }

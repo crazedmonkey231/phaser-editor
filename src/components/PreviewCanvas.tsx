@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
 import { useEditorStore } from '../store/editorStore';
-import { AnyGameObject, CircleObject, RectangleObject, SceneData, TextObject } from '../types/scene';
+import { AnyGameObject, CircleObject, ImageObject, RectangleObject, SceneData, TextObject } from '../types/scene';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -21,7 +21,7 @@ function cssColorToRgb(color: string): { r: number; g: number; b: number } {
 
 // ── Phaser Scene ──────────────────────────────────────────────────────────────
 
-type PhaserDisplayObject = Phaser.GameObjects.Graphics | Phaser.GameObjects.Text;
+type PhaserDisplayObject = Phaser.GameObjects.Graphics | Phaser.GameObjects.Text | Phaser.GameObjects.Image;
 
 interface EditorSceneInitData {
   sceneData: SceneData;
@@ -36,7 +36,7 @@ class EditorScene extends Phaser.Scene {
   public displayObjects: Map<string, PhaserDisplayObject> = new Map();
   private selectionHighlight!: Phaser.GameObjects.Graphics;
   private gridGraphics!: Phaser.GameObjects.Graphics;
-  private sceneData!: SceneData;
+  public sceneData!: SceneData;
   private isPlaying = false;
   private onSelect!: (id: string | null) => void;
   private onUpdateObject!: (id: string, updates: Partial<AnyGameObject>) => void;
@@ -101,6 +101,19 @@ class EditorScene extends Phaser.Scene {
           case 'bottomLeft':  return { dx: 0, dy: h };
           case 'bottomRight': return { dx: w, dy: h };
           default:            return { dx: 0, dy: 0 }; // topLeft
+        }
+      }
+    } else if (obj.type === 'image') {
+      const go = this.displayObjects.get(objId);
+      if (go instanceof Phaser.GameObjects.Image) {
+        const hw = (go.width * go.scaleX) / 2;
+        const hh = (go.height * go.scaleY) / 2;
+        switch (origin) {
+          case 'topLeft':     return { dx: -hw, dy: -hh };
+          case 'topRight':    return { dx:  hw, dy: -hh };
+          case 'bottomLeft':  return { dx: -hw, dy:  hh };
+          case 'bottomRight': return { dx:  hw, dy:  hh };
+          default:            return { dx: 0, dy: 0 };
         }
       }
     }
@@ -245,13 +258,68 @@ class EditorScene extends Phaser.Scene {
       textObj.setDepth(t.depth);
       textObj.setAlpha(t.alpha);
       go = textObj;
+    } else if (obj.type === 'image') {
+      const img = obj as ImageObject;
+      if (!img.imageKey) return null;
+
+      const createImageGO = (): Phaser.GameObjects.Image => {
+        const gameImg = this.add.image(img.x, img.y, img.imageKey);
+        gameImg.setScale(img.scaleX, img.scaleY);
+        gameImg.setRotation(img.rotation);
+        gameImg.setDepth(img.depth);
+        gameImg.setAlpha(img.alpha);
+        gameImg.setVisible(img.visible);
+        this.displayObjects.set(obj.id, gameImg);
+
+        if (!this.isPlaying) {
+          gameImg.setInteractive();
+          gameImg.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+            this.onSelect(obj.id);
+            this.dragObjectId = obj.id;
+            this.dragOffsetX = pointer.worldX - gameImg.x;
+            this.dragOffsetY = pointer.worldY - gameImg.y;
+            this.game.canvas.style.cursor = 'grabbing';
+          });
+          gameImg.on('pointerover', () => {
+            if (!this.dragObjectId) this.game.canvas.style.cursor = 'grab';
+          });
+          gameImg.on('pointerout', () => {
+            if (!this.dragObjectId) this.game.canvas.style.cursor = 'default';
+          });
+        }
+        return gameImg;
+      };
+
+      if (this.textures.exists(img.imageKey)) {
+        go = createImageGO();
+      } else {
+        const assets = useEditorStore.getState().assets;
+        const asset = assets.find((a) => a.key === img.imageKey);
+        if (asset) {
+          const htmlImg = new Image();
+          htmlImg.onload = () => {
+            if (!this.textures.exists(img.imageKey)) {
+              this.textures.addImage(img.imageKey, htmlImg);
+            }
+            const old = this.displayObjects.get(obj.id);
+            if (old) { old.destroy(); this.displayObjects.delete(obj.id); }
+            createImageGO();
+          };
+          htmlImg.onerror = () => {
+            console.warn(`[ImageObject] Failed to load image for key "${img.imageKey}"`);
+          };
+          htmlImg.src = asset.dataUrl;
+        }
+        return null;
+      }
     }
 
     if (go) {
       this.displayObjects.set(obj.id, go);
 
       // Make interactive for selection in edit mode
-      if (!this.isPlaying) {
+      // Images handle their own interaction inside createImageGO
+      if (!this.isPlaying && obj.type !== 'image') {
         if (go instanceof Phaser.GameObjects.Graphics) {
           go.setInteractive(
             new Phaser.Geom.Rectangle(
@@ -338,6 +406,17 @@ class EditorScene extends Phaser.Scene {
       if (go instanceof Phaser.GameObjects.Text) {
         const b = go.getBounds();
         this.selectionHighlight.strokeRect(b.x - 2, b.y - 2, b.width + 4, b.height + 4);
+      }
+    } else if (obj.type === 'image') {
+      if (go instanceof Phaser.GameObjects.Image) {
+        const hw = (go.width * go.scaleX) / 2;
+        const hh = (go.height * go.scaleY) / 2;
+        this.selectionHighlight.strokeRect(
+          currentX - hw - 2,
+          currentY - hh - 2,
+          hw * 2 + 4,
+          hh * 2 + 4
+        );
       }
     }
   }
@@ -456,6 +535,35 @@ function PreviewCanvas() {
       // Snap settings changed
       if (state.snapToGrid !== prev.snapToGrid || state.gridSize !== prev.gridSize) {
         pScene.updateSnapSettings(state.snapToGrid, state.gridSize);
+      }
+
+      // New assets added/removed – sync textures into Phaser
+      if (state.assets !== prev.assets) {
+        const newKeys = new Set(state.assets.map((a) => a.key));
+        state.assets.forEach((asset) => {
+          if (!pScene.textures.exists(asset.key)) {
+            const htmlImg = new Image();
+            htmlImg.onload = () => {
+              if (!pScene.textures.exists(asset.key)) {
+                pScene.textures.addImage(asset.key, htmlImg);
+              }
+              // Re-render any image objects using this key
+              pScene.sceneData.objects
+                .filter((o) => o.type === 'image' && (o as ImageObject).imageKey === asset.key)
+                .forEach((o) => pScene.updateDisplayObject(o));
+            };
+            htmlImg.onerror = () => {
+              console.warn(`[Assets] Failed to load texture for key "${asset.key}"`);
+            };
+            htmlImg.src = asset.dataUrl;
+          }
+        });
+        // Remove textures that were deleted
+        prev.assets.forEach((asset) => {
+          if (!newKeys.has(asset.key) && pScene.textures.exists(asset.key)) {
+            pScene.textures.remove(asset.key);
+          }
+        });
       }
 
       // Objects changed

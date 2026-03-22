@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { AnyGameObject, SceneData } from '../types/scene';
+import { AnyGameObject, AssetEntry, SceneData } from '../types/scene';
 
 interface EditorState {
   scene: SceneData;
@@ -8,6 +8,7 @@ interface EditorState {
   isPlaying: boolean;
   gridSize: number;
   snapToGrid: boolean;
+  assets: AssetEntry[];
 
   addObject: (obj: AnyGameObject) => void;
   removeObject: (id: string) => void;
@@ -19,6 +20,8 @@ interface EditorState {
   setPlaying: (playing: boolean) => void;
   setGridSize: (size: number) => void;
   setSnapToGrid: (enabled: boolean) => void;
+  addAsset: (entry: AssetEntry) => void;
+  removeAsset: (key: string) => void;
 }
 
 const defaultScene: SceneData = {
@@ -38,6 +41,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   isPlaying: false,
   gridSize: 20,
   snapToGrid: false,
+  assets: [],
 
   addObject: (obj) =>
     set((state) => ({
@@ -83,4 +87,14 @@ export const useEditorStore = create<EditorState>((set) => ({
   setGridSize: (size) => set({ gridSize: size }),
 
   setSnapToGrid: (enabled) => set({ snapToGrid: enabled }),
+
+  addAsset: (entry) =>
+    set((state) => ({
+      assets: [...state.assets.filter((a) => a.key !== entry.key), entry],
+    })),
+
+  removeAsset: (key) =>
+    set((state) => ({
+      assets: state.assets.filter((a) => a.key !== key),
+    })),
 }));

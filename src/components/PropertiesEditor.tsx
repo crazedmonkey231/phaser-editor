@@ -1,5 +1,6 @@
+import { useRef } from 'react';
 import { useEditorStore } from '../store/editorStore';
-import { AnyGameObject, RectangleObject, CircleObject, TextObject, SnapOrigin } from '../types/scene';
+import { AnyGameObject, RectangleObject, CircleObject, TextObject, ImageObject, SnapOrigin } from '../types/scene';
 
 function PropRow({
   label,
@@ -12,6 +13,57 @@ function PropRow({
     <div className="prop-row">
       <span className="prop-label">{label}</span>
       {children}
+    </div>
+  );
+}
+
+function ImagePicker({ currentKey, onSelect }: { currentKey: string; onSelect: (key: string) => void }) {
+  const { assets, addAsset } = useEditorStore();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    let key = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+    if (!key) key = `image_${Date.now()}`;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      addAsset({ key, dataUrl, filename: file.name });
+      onSelect(key);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  return (
+    <div className="image-picker">
+      <button className="btn image-picker-upload" onClick={() => fileInputRef.current?.click()}>
+        + Upload
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleUpload}
+      />
+      {assets.length === 0 && (
+        <div className="image-picker-empty">No images uploaded yet.</div>
+      )}
+      <div className="image-picker-grid">
+        {assets.map((asset) => (
+          <button
+            key={asset.key}
+            className={`image-picker-thumb${currentKey === asset.key ? ' selected' : ''}`}
+            title={asset.filename}
+            onClick={() => onSelect(asset.key)}
+          >
+            <img src={asset.dataUrl} alt={asset.filename} />
+            <span>{asset.key}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -303,6 +355,39 @@ function PropertiesEditor() {
                 value={(selectedObj as TextObject).color}
                 onChange={(e) => upd({ color: e.target.value } as Partial<TextObject>)}
                 style={{ width: 80, flexShrink: 0 }}
+              />
+            </PropRow>
+          </div>
+        )}
+
+        {/* Image */}
+        {selectedObj.type === 'image' && (
+          <div className="prop-section">
+            <div className="prop-section-title">Image</div>
+            <PropRow label="Image">
+              <ImagePicker
+                currentKey={(selectedObj as ImageObject).imageKey}
+                onSelect={(key) => upd({ imageKey: key } as Partial<ImageObject>)}
+              />
+            </PropRow>
+            <PropRow label="Scale X">
+              <input
+                className="prop-input"
+                type="number"
+                step="0.1"
+                min="0.01"
+                value={(selectedObj as ImageObject).scaleX}
+                onChange={(e) => upd({ scaleX: Number(e.target.value) } as Partial<ImageObject>)}
+              />
+            </PropRow>
+            <PropRow label="Scale Y">
+              <input
+                className="prop-input"
+                type="number"
+                step="0.1"
+                min="0.01"
+                value={(selectedObj as ImageObject).scaleY}
+                onChange={(e) => upd({ scaleY: Number(e.target.value) } as Partial<ImageObject>)}
               />
             </PropRow>
           </div>

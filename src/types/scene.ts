@@ -50,6 +50,12 @@ export interface ImageObject extends BaseGameObject {
 
 export type AnyGameObject = RectangleObject | CircleObject | TextObject | ImageObject;
 
+export interface AssetEntry {
+  key: string;
+  dataUrl: string;
+  filename: string;
+}
+
 export interface SceneData {
   id: string;
   name: string;

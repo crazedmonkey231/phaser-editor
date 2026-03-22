@@ -158,7 +158,9 @@ function Toolbar() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Ctrl+C / Ctrl+V copy-paste
+  // Ctrl+C / Ctrl+V copy-paste — useEditorStore.getState() is called inside the
+  // handler intentionally so each keystroke reads the latest state without
+  // re-registering the listener on every render.
   useEffect(() => {
     const handleCopyPaste = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;

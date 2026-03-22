@@ -298,6 +298,9 @@ class EditorScene extends Phaser.Scene {
         if (asset) {
           const htmlImg = new Image();
           htmlImg.onload = () => {
+            // Guard: object may have been deleted before the texture finished loading
+            const stillExists = this.sceneData.objects.some((o) => o.id === obj.id);
+            if (!stillExists) return;
             if (!this.textures.exists(img.imageKey)) {
               this.textures.addImage(img.imageKey, htmlImg);
             }
@@ -544,6 +547,8 @@ function PreviewCanvas() {
           if (!pScene.textures.exists(asset.key)) {
             const htmlImg = new Image();
             htmlImg.onload = () => {
+              // Guard: asset may have been removed before the texture finished loading
+              if (!useEditorStore.getState().assets.some((a) => a.key === asset.key)) return;
               if (!pScene.textures.exists(asset.key)) {
                 pScene.textures.addImage(asset.key, htmlImg);
               }

@@ -31,7 +31,22 @@ const defaultScene: SceneData = {
   width: 640,
   height: 480,
   objects: [],
-  script: '// Scene script\n// The "scene" variable refers to the Phaser Scene instance\n// Example: scene.add.text(100, 100, "Hello!", { color: "#ffffff" });\n',
+  script: [
+    'function preload() {',
+    '  // Load assets here',
+    '  // this.load.image(\'key\', \'url\');',
+    '}',
+    '',
+    'function create() {',
+    '  // \'this\' is the Phaser Scene instance',
+    '  this.add.text(100, 100, \'Hello, World!\', { color: \'#ffffff\', fontSize: \'24px\' });',
+    '}',
+    '',
+    'function update() {',
+    '  // Runs every frame',
+    '}',
+    '',
+  ].join('\n'),
 };
 
 export const useEditorStore = create<EditorState>((set) => ({

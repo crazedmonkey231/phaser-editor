@@ -35,7 +35,6 @@ body,
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
-/* ── Layout ── */
 .app-layout {
   display: grid;
   grid-template-rows: 48px 1fr 200px;
@@ -63,6 +62,21 @@ body,
   grid-row: 3;
   border-top: 1px solid var(--border);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.scripting-resize-handle {
+  height: 5px;
+  cursor: ns-resize;
+  background: var(--border);
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.scripting-resize-handle:hover,
+.scripting-resize-handle:active {
+  background: var(--accent);
 }
 
 .panel {
@@ -422,7 +436,8 @@ select.prop-input {
 .scripting-area {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   background: var(--bg-dark);
   overflow: hidden;
 }

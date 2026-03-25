@@ -62,8 +62,9 @@ function ScriptingArea() {
       <div className="scripting-header">
         <span className="scripting-title">Scene Script</span>
         <span className="scripting-hint">
-          Variable <code style={{ color: '#a78bfa' }}>scene</code> = Phaser Scene instance (Play
-          mode)
+          Use <code style={{ color: '#a78bfa' }}>this</code> for the Phaser Scene inside{' '}
+          <code style={{ color: '#a78bfa' }}>create()</code> /{' '}
+          <code style={{ color: '#a78bfa' }}>update()</code> (Play mode)
         </span>
       </div>
       <div className="cm-editor-wrap" ref={containerRef} />

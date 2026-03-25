@@ -12,7 +12,8 @@ A browser-based 2D scene editor built with Phaser 3 + React + Zustand.
 - Edit object properties (position, rotation, alpha, depth, color, size, scale, etc.) in the Properties panel
 - **Copy/Paste** — Ctrl+C copies the selected object; Ctrl+V pastes it offset by +20/+20 with a `(copy)` name suffix
 - Import/Export scenes as JSON
-- Run scene scripts in Play mode
+- Run scene scripts in Play mode using standard Phaser lifecycle functions (`preload`, `create`, `update`); `this` = Phaser Scene inside each function
+- Resizable scripting panel — drag the handle at the top of the script area to adjust its height (100–600 px)
 
 ## Agent Notes
 
@@ -25,5 +26,7 @@ A browser-based 2D scene editor built with Phaser 3 + React + Zustand.
 - `AssetEntry` lives in `src/types/scene.ts` with fields `key`, `dataUrl`, `filename`. `addAsset` deduplicates by key.
 - Image texture loading in Phaser: `createDisplayObject` for `type === 'image'` checks `textures.exists(key)` first (sync); otherwise creates an HTMLImageElement, loads the dataUrl, then calls `textures.addImage` on load. The store subscription also pre-loads textures when `state.assets` changes.
 - `EditorScene.sceneData` is `public` to allow the store subscription to access it for re-rendering image objects after texture load.
+- Script execution model: `runScript()` in `PreviewCanvas.tsx` wraps the user script in `new Function`, extracts `preload`/`create`/`update` function declarations, and calls them with `this = EditorScene`. The `update()` function is stored in `scriptUpdate` and called each frame from `EditorScene.update()` when in play mode.
+- Scripting panel height is controlled by `scriptHeight` state in `App.tsx` (default 200 px, range 100–600 px); the `app-layout` grid row is set via inline style. The drag handle is a `.scripting-resize-handle` div in `.app-scripting`.
 - Copy/paste clipboard is a module-level variable in `Toolbar.tsx` (`let clipboard: AnyGameObject | null`); Ctrl+C/V are guarded against INPUT/TEXTAREA/SELECT and call `e.preventDefault()`.
 - `ImagePicker` component is defined in `PropertiesEditor.tsx`; it generates asset keys by stripping the file extension and sanitizing non-alphanumeric chars, with a `image_{timestamp}` fallback for empty keys.

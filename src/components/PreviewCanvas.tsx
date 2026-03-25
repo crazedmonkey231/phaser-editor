@@ -41,6 +41,7 @@ class EditorScene extends Phaser.Scene {
   private onSelect!: (id: string | null) => void;
   private onUpdateObject!: (id: string, updates: Partial<AnyGameObject>) => void;
   private scriptCleanup: (() => void) | null = null;
+  private scriptUpdate: ((...args: unknown[]) => void) | null = null;
   private dragObjectId: string | null = null;
   private dragOffsetX = 0;
   private dragOffsetY = 0;
@@ -429,13 +430,39 @@ class EditorScene extends Phaser.Scene {
     try {
       // NOTE: new Function() is intentional here. This is a game editor where the
       // author writes and runs their own scene scripts. The script receives the
-      // Phaser scene instance as its only argument. Users should only run scripts
-      // they trust, as this executes arbitrary JavaScript in the page context.
+      // Phaser scene instance as `this` via standard lifecycle functions (preload,
+      // create, update). Users should only run scripts they trust, as this executes
+      // arbitrary JavaScript in the page context.
       // eslint-disable-next-line no-new-func
-      const fn = new Function('scene', script);
-      fn(this);
+      const fn = new Function(`
+        ${script}
+        return {
+          preload: typeof preload !== 'undefined' ? preload : null,
+          create:  typeof create  !== 'undefined' ? create  : null,
+          update:  typeof update  !== 'undefined' ? update  : null,
+        };
+      `);
+      const { preload, create, update } = fn() as {
+        preload: ((...args: unknown[]) => void) | null;
+        create:  ((...args: unknown[]) => void) | null;
+        update:  ((...args: unknown[]) => void) | null;
+      };
+      if (typeof preload === 'function') preload.call(this);
+      if (typeof create  === 'function') create.call(this);
+      this.scriptUpdate = typeof update === 'function' ? update : null;
     } catch (err) {
       console.error('[SceneScript]', err);
+    }
+  }
+
+  update(_time: number, _delta: number) {
+    if (this.isPlaying && this.scriptUpdate) {
+      try {
+        this.scriptUpdate.call(this);
+      } catch (err) {
+        console.error('[SceneScript update]', err);
+        this.scriptUpdate = null;
+      }
     }
   }
 
@@ -445,6 +472,7 @@ class EditorScene extends Phaser.Scene {
       this.scriptCleanup();
       this.scriptCleanup = null;
     }
+    this.scriptUpdate = null;
     if (playing) {
       this.runScript(script);
     }
